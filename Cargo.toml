@@ -1,6 +1,28 @@
+// Project: VoidCLI
+// A modern GPU-accelerated terminal emulator built in Rust
+
+// Cargo.toml (Root Project)
 [package]
 name = "VoidCLI"
 version = "0.1.0"
 edition = "2021"
+authors = ["P Deepanshun"]
+description = "A modern GPU-accelerated terminal emulator"
+
+[workspace]
+members = [
+    "crates/core",
+    "crates/ui",
+    "crates/term",
+    "crates/blocks",
+    "crates/config",
+    "crates/themes",
+    "crates/commands",
+]
 
 [dependencies]
+clap = { version = "4.4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.10"
+anyhow = "1.0"
+tokio = { version = "1.35", features = ["full"] }
