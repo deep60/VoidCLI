@@ -1,0 +1,9 @@
+[package]
+name = "commands"
+version = "0.1.0"
+edition = "2021"
+authors = ["P Deepanshun"]
+description = "Command handling for VoidCLI"
+
+[dependencies]
+

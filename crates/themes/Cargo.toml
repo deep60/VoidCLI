@@ -1,0 +1,9 @@
+[package]
+name = "themes"
+version = "0.1.0"
+edition = "2021"
+authors = ["P Deepanshun"]
+description = "Theming system for VoidCLI"
+
+[dependencies]
+

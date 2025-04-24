@@ -1,7 +1,7 @@
-// Project: VoidCLI
-// A modern GPU-accelerated terminal emulator built in Rust
+#Project: VoidCLI
+#A modern GPU-accelerated terminal emulator built in Rust
 
-// Cargo.toml (Root Project)
+#Cargo.toml (Root Project)
 [package]
 name = "VoidCLI"
 version = "0.1.0"
