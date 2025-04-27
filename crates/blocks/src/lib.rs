@@ -3,53 +3,38 @@
 // This module provides reusable UI components for terminal interfaces
 
 /// Represents a UI block in the terminal
-#[derive(Debug, Clone)]
-pub struct Block {
-    x: u16,
-    y: u16,
-    width: u16,
-    height: u16,
-    title: Option<String>,
+mod block;
+mod command;
+mod navigation;
+mod output;
+
+use std::{io::Seek, sync::Arc};
+use tokio::sync::Mutex;
+
+pub use block::Block;
+
+pub struct BlockManager {
+    state: Arc<Mutex<AppState>>,
+    blocks: Vec<Block>,
 }
 
-impl Block {
-    /// Creates a new block with the specified dimensions
-    pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
-        Block {
-            x,
-            y,
-            width,
-            height,
-            title: None,
+impl BlockManager {
+    pub fn new(state: Arc<Mutex<AppState>>) -> Self {
+        Self {
+            state,
+            blocks: Vec::new(),
         }
     }
 
-    /// Sets the title of the block
-    pub fn with_title(mut self, title: &str) -> Self {
-        self.title = Some(title.to_string());
-        self
+    pub fn add_block(&mut self, block: Block) {
+        self.blocks.push(block);
     }
 
-    /// Returns the dimensions of the block
-    pub fn dimensions(&self) -> (u16, u16, u16, u16) {
-        (self.x, self.y, self.width, self.height)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_block_creation() {
-        let block = Block::new(0, 0, 10, 5);
-        assert_eq!(block.dimensions(), (0, 0, 10, 5));
+    pub fn get_block(&self, id: usize) -> Option<&Block> {
+        self.blocks.get(id)
     }
 
-    #[test]
-    fn test_block_with_title() {
-        let block = Block::new(0, 0, 10, 5).with_title("Test Block");
-        assert_eq!(block.title, Some("Test Block".to_string()));
+    pub fn get_current_block(&self) -> Option<&Block> {
+        self.blocks.last()
     }
 }
-

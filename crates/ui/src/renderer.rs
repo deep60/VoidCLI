@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use config::Config;
 use theme::Theme;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
@@ -29,6 +29,9 @@ impl Renderer {
 
     pub fn initialize(&self) -> Result<()> {
         //initialize WGPU, create device, queue, etc;
+        Ok(())
+    }
+    pub fn render_frame(&self) -> Result<()> {
         Ok(())
     }
 }
