@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
     info!("Starting VoidCLI Terminal");
 
     let config = match cli.config {
-        Some(ref, path) => Config::from_file(path)?,
+        Some(ref path) => Config::from_file(path)?,
         None => Config::default(),
     };
 
