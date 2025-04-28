@@ -2,118 +2,92 @@
 //
 // This module provides functionality for managing terminal color schemes and styling
 
-/// Represents an RGB color
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-}
+use anyhow::Result;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-impl Color {
-    /// Creates a new color with the given RGB values
-    pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Color { r, g, b }
-    }
-
-    /// Creates a new color from a hex string (e.g., "#ff0000" for red)
-    pub fn from_hex(hex: &str) -> Result<Self, &'static str> {
-        if !hex.starts_with('#') || hex.len() != 7 {
-            return Err("Invalid hex color format");
-        }
-
-        let r = u8::from_str_radix(&hex[1..3], 16).map_err(|_| "Invalid red component")?;
-        let g = u8::from_str_radix(&hex[3..5], 16).map_err(|_| "Invalid green component")?;
-        let b = u8::from_str_radix(&hex[5..7], 16).map_err(|_| "Invalid blue component")?;
-
-        Ok(Color { r, g, b })
-    }
-
-    /// Returns the RGB components as a tuple
-    pub fn as_rgb(&self) -> (u8, u8, u8) {
-        (self.r, self.g, self.b)
-    }
-}
-
-/// Represents a terminal theme
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
-    name: String,
-    background: Color,
-    foreground: Color,
-    cursor: Color,
-    selection: Color,
-    black: Color,
-    red: Color,
-    green: Color,
-    yellow: Color,
-    blue: Color,
-    magenta: Color,
-    cyan: Color,
-    white: Color,
+    pub name: String,
+    pub author: String,
+    pub colors: ColorScheme,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ColorScheme {
+    pub background: String,
+    pub foreground: String,
+    pub cursor: String,
+    pub selection: String,
+    pub black: String,
+    pub red: String,
+    pub green: String,
+    pub yellow: String,
+    pub blue: String,
+    pub magenta: String,
+    pub cyan: String,
+    pub white: String,
+    pub bright_black: String,
+    pub bright_red: String,
+    pub bright_green: String,
+    pub bright_yellow: String,
+    pub bright_blue: String,
+    pub bright_magenta: String,
+    pub bright_cyan: String,
+    pub bright_white: String,
+}
+
+lazy_static! {
+    static ref THEMES: HashMap<String, Theme> = {
+        let mut m = HashMap::new();
+
+        //Add default themes
+        m.insert("dark".to_string(), Theme {
+            name: "Dark".to_string(),
+            author: "VYZE".to_string(),
+            colors: ColorScheme {
+                background: "#282a36".to_string(),
+                foreground: "#f8f8f2".to_string(),
+                cursor: "#f8f8f2".to_string(),
+                selection: "#44475a".to_string(),
+                black: "#21222c".to_string(),
+                red: "#ff5555".to_string(),
+                green: " #50fa7b".to_string(),
+                yellow: "#f1f8ac".to_string(),
+                blue: "#bd93f9".to_string(),
+                magenta: "#ff79c6".to_string(),
+                cyan: "#8be9fd".to_string(),
+                white: "#f8f8f2".to_string(),
+                bright_black: "#6272a4".to_string(),
+                bright_red: "#ff6e6e".to_string(),
+                bright_green: "#69ff94".to_string(),
+                bright_yellow: "ffffa5".to_string(),
+                bright_blue: "#d6acff".to_string(),
+                bright_magenta: "#ff92df".to_string(),
+                bright_cyan: "#a4ffff".to_string(),
+                bright_white: "#ffffff".to_string(),
+            },
+        });
+        //Add more items
+        m
+    };
 }
 
 impl Theme {
-    /// Creates a new theme with the given name and colors
-    pub fn new(name: &str) -> Self {
-        // Default to a dark theme
-        Theme {
-            name: name.to_string(),
-            background: Color::new(0, 0, 0),
-            foreground: Color::new(204, 204, 204),
-            cursor: Color::new(255, 255, 255),
-            selection: Color::new(64, 64, 64),
-            black: Color::new(0, 0, 0),
-            red: Color::new(204, 0, 0),
-            green: Color::new(0, 204, 0),
-            yellow: Color::new(204, 204, 0),
-            blue: Color::new(0, 0, 204),
-            magenta: Color::new(204, 0, 204),
-            cyan: Color::new(0, 204, 204),
-            white: Color::new(204, 204, 204),
-        }
+    pub fn from_name(name: &str) -> Option<Self> {
+        THEMES.get(name).cloned()
     }
 
-    /// Returns the theme name
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn from_file(path: &str) -> Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        let theme: Theme = serde_yaml::from_str(&contents)?;
+        Ok(theme)
     }
 }
 
-/// Provides a default dark theme
-pub fn default_dark() -> Theme {
-    Theme::new("Dark")
-}
-
-/// Provides a default light theme
-pub fn default_light() -> Theme {
-    let mut theme = Theme::new("Light");
-    theme.background = Color::new(255, 255, 255);
-    theme.foreground = Color::new(0, 0, 0);
-    theme.selection = Color::new(179, 215, 255);
-    theme
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_color_creation() {
-        let color = Color::new(255, 0, 0);
-        assert_eq!(color.as_rgb(), (255, 0, 0));
-    }
-
-    #[test]
-    fn test_color_from_hex() {
-        let color = Color::from_hex("#ff0000").unwrap();
-        assert_eq!(color.as_rgb(), (255, 0, 0));
-    }
-
-    #[test]
-    fn test_theme_creation() {
-        let theme = Theme::new("Test Theme");
-        assert_eq!(theme.name(), "Test Theme");
+impl Default for Theme {
+    fn default() -> Self {
+        THEMES.get("dark").unwrap().clone()
     }
 }
-
