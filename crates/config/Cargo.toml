@@ -6,4 +6,6 @@ authors = ["P Deepanshun"]
 description = "Configuration management for VoidCLI"
 
 [dependencies]
-
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"

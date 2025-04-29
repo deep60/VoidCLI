@@ -3,10 +3,51 @@ use log::info;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
-use VoidCLI_config::Config;
-
-use crate::events::EventLoop;
+use config::Config;
+use crate::events::{Event, EventLoop};
 use crate::state::AppState;
+
+// Terminal implementation using alacritty_terminal
+pub struct Terminal {
+    // Add terminal fields here
+}
+
+impl Terminal {
+    pub fn new(config: &Config, event_tx: mpsc::Sender<Event>) -> Self {
+        // This is a placeholder implementation
+        Self {}
+    }
+
+    pub async fn initialize(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
+// Placeholder for renderer
+pub struct Renderer {
+    config: Config,
+}
+
+impl Renderer {
+    pub fn new(config: &Config) -> Self {
+        Self { config: config.clone() }
+    }
+
+    pub async fn initialize(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
+// Placeholder for block manager
+pub struct BlockManager {
+    state: Arc<Mutex<AppState>>,
+}
+
+impl BlockManager {
+    pub fn new(state: Arc<Mutex<AppState>>) -> Self {
+        Self { state }
+    }
+}
 
 pub struct VoidCLI {
     config: Config,

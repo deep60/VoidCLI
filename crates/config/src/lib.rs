@@ -12,7 +12,7 @@ pub struct Config {
     pub font: FontConfig,
     pub terminal: TerminalConfig,
     pub keybindings: KeybindingsConfig,
-    pub performance: performanceConfig,
+    pub performance: PerformanceConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -26,3 +26,6 @@ log = "0.4"
 env_logger = "0.10"
 anyhow = "1.0"
 tokio = { version = "1.35", features = ["full"] }
+# Add workspace crates
+config = { path = "crates/config" }
+core = { path = "crates/core" }
