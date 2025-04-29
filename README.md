@@ -1,63 +1,56 @@
-VoidCLI/
-├── Cargo.toml              # Root workspace configuration
-├── src/
-│   └── main.rs             # Application entry point
-│
-├── crates/
-│   ├── core/               # Core application functionality
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── app.rs      # Main application state
-│   │       ├── state.rs    # State management
-│   │       ├── events.rs   # Event loop and handling
-│   │       └── error.rs    # Error handling
-│   │
-│   ├── term/               # Terminal emulation
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── pty.rs      # Pseudoterminal implementation
-│   │       ├── parser.rs   # ANSI/VT sequence parser
-│   │       ├── process.rs  # Shell process management
-│   │       └── vt.rs       # VT emulation
-│   │
-│   ├── ui/                 # UI rendering system
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── renderer.rs # GPU-accelerated renderer
-│   │       ├── window.rs   # Window management
-│   │       ├── font.rs     # Font handling
-│   │       ├── shaders.rs  # WGPU shaders
-│   │       └── widgets.rs  # UI components
-│   │
-│   ├── blocks/             # Block-based UI management
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── block.rs    # Block implementation
-│   │       ├── command.rs  # Command handling
-│   │       ├── output.rs   # Command output handling
-│   │       └── navigation.rs # Block navigation
-│   │
-│   ├── config/             # Configuration management
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       └── lib.rs      # Config structures and loading
-│   │
-│   ├── themes/             # Theme management
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       └── lib.rs      # Theme implementation
-│   │
-│   └── commands/           # Command tools and suggestions
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs
-│           ├── history.rs  # Command history
-│           ├── completion.rs # Tab completion
-│           ├── suggestions.rs # Command suggestions
-│           └── palette.rs  # Command palette
-│
-└── .gitignore
+```
+ (VoidCLI)
+    A --> B(Cargo.toml)
+    A --> C(src/main.rs)
+    A --> D(crates)
+    
+    D --> D1(core)
+    D1 --> D1a(Cargo.toml)
+    D1 --> D1b(src/lib.rs)
+    D1 --> D1c(src/app.rs)
+    D1 --> D1d(src/state.rs)
+    D1 --> D1e(src/events.rs)
+    D1 --> D1f(src/error.rs)
+    
+    D --> D2(term)
+    D2 --> D2a(Cargo.toml)
+    D2 --> D2b(src/lib.rs)
+    D2 --> D2c(src/pty.rs)
+    D2 --> D2d(src/parser.rs)
+    D2 --> D2e(src/process.rs)
+    D2 --> D2f(src/vt.rs)
+    
+    D --> D3(ui)
+    D3 --> D3a(Cargo.toml)
+    D3 --> D3b(src/lib.rs)
+    D3 --> D3c(src/renderer.rs)
+    D3 --> D3d(src/window.rs)
+    D3 --> D3e(src/font.rs)
+    D3 --> D3f(src/shaders.rs)
+    D3 --> D3g(src/widgets.rs)
+    
+    D --> D4(blocks)
+    D4 --> D4a(Cargo.toml)
+    D4 --> D4b(src/lib.rs)
+    D4 --> D4c(src/block.rs)
+    D4 --> D4d(src/command.rs)
+    D4 --> D4e(src/output.rs)
+    D4 --> D4f(src/navigation.rs)
+    
+    D --> D5(config)
+    D5 --> D5a(Cargo.toml)
+    D5 --> D5b(src/lib.rs)
+    
+    D --> D6(themes)
+    D6 --> D6a(Cargo.toml)
+    D6 --> D6b(src/lib.rs)
+    
+    D --> D7(commands)
+    D7 --> D7a(Cargo.toml)
+    D7 --> D7b(src/lib.rs)
+    D7 --> D7c(src/history.rs)
+    D7 --> D7d(src/completion.rs)
+    D7 --> D7e(src/suggestions.rs)
+    D7 --> D7f(src/palette.rs)
+
+    A --> E(.gitignore)
