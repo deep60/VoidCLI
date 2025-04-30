@@ -6,4 +6,10 @@ authors = ["P Deepanshun"]
 description = "Terminal block components for VoidCLI"
 
 [dependencies]
+tokio = { version = "1", features = ["sync"] }
+chrono = { version = "0.4", features = ["serde"] }
+ropey = "1.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
 
