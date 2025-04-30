@@ -1,13 +1,17 @@
 use serde::{Deserialize, Serialize};
 use core::str;
-use std::fmt::{self, write};
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Command {
-    pub raw: String,   ///the raw command string entered by the user
-    pub tokens: Vec<String>,   ///the processed and tokenized command
-    pub env_vars: Vec<(String, String)>,   ///environment variables for this Command
-    pub working_dir: String,     ///Working directory for this command
+    ///the raw command string entered by the user
+    pub raw: String,
+    ///the processed and tokenized command
+    pub tokens: Vec<String>,
+    ///environment variables for this Command
+    pub env_vars: Vec<(String, String)>,
+    ///Working directory for this command
+    pub working_dir: String,
 }
 
 impl Command {

@@ -1,8 +1,7 @@
 use crate::command::Command;
+use crate::output::Output;
 use chrono::{DateTime, Utc};
-use ropey::Rope;
 use serde::{Deserialize, Serialize};
-use std::process::Output;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {

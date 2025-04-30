@@ -1,10 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::{
-    os::unix::process::{self, ExitStatusExt},
-    process,
-};
-use tokio::process;
+use std::process;
 
+/// Representation of command output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     pub stdout: Vec<u8>,
@@ -13,7 +10,7 @@ pub struct Output {
 }
 
 impl Output {
-    /// create a new empty Output
+    /// Create a new empty Output instance
     pub fn new() -> Self {
         Self {
             stdout: Vec::new(),
@@ -27,16 +24,17 @@ impl Output {
         self.stdout.extend_from_slice(data);
     }
 
-    ///Append stderr content
+    /// Append stderr content
     pub fn append_stderr(&mut self, data: &[u8]) {
         self.stderr.extend_from_slice(data);
     }
 
-    /// set exit status
-    pub fn set_status(&mut self) -> String {
+    /// Set exit status
+    pub fn set_status(&mut self, status: i32) {
         self.status = Some(status);
     }
 
+    /// Get stdout as string, handling UTF-8 conversion
     pub fn stdout_string(&self) -> String {
         String::from_utf8_lossy(&self.stdout).into_owned()
     }
@@ -46,7 +44,7 @@ impl Output {
         String::from_utf8_lossy(&self.stderr).into_owned()
     }
 
-    ///was the command successful
+    /// Was the command successful
     pub fn success(&self) -> bool {
         self.status == Some(0)
     }
@@ -62,19 +60,6 @@ impl From<process::Output> for Output {
     }
 }
 
-impl Into<process::Output> for Output {
-    fn into(self) -> process::Output {
-        process::Output {
-            status: self.stdout,
-            stdout: self.stderr,
-            stderr: match self.status {
-                Some(code) => process::ExitStatus::from_raw(code as i32),
-                None => process::ExitStatus::from_raw(0),
-            },
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,7 +71,7 @@ mod tests {
         output.append_stderr(b"Error message");
         output.set_status(0);
 
-        assert_eq!(output.stdout_string(), "Hello, world!");
+        assert_eq!(output.stdout_string(), "Hello, world");
         assert_eq!(output.stderr_string(), "Error message");
         assert!(output.success());
     }

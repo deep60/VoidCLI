@@ -8,18 +8,19 @@ mod command;
 mod navigation;
 mod output;
 
-use std::{io::Seek, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub use block::Block;
 
-pub struct BlockManager {
-    state: Arc<Mutex<AppState>>,
+/// Block manager that stores and manages terminal UI blocks
+pub struct BlockManager<A> {
+    state: Arc<Mutex<A>>,
     blocks: Vec<Block>,
 }
 
-impl BlockManager {
-    pub fn new(state: Arc<Mutex<AppState>>) -> Self {
+impl<A> BlockManager<A> {
+    pub fn new(state: Arc<Mutex<A>>) -> Self {
         Self {
             state,
             blocks: Vec::new(),

@@ -1,4 +1,3 @@
-use crate::Block;
 use std::{collections::HashMap, usize};
 
 ///Represent navigation state between blocks
@@ -24,7 +23,7 @@ impl BlockNavigation {
 
     ///Set the current block and update navigation history
     pub fn set_current_block(&mut self, block_id: usize) {
-        ///Don't add duplicate history entries
+        //Don't add duplicate history entries
         if Some(block_id) != self.current_block_id {
             if self.history_position < self.history.len() {
                 self.history.truncate(self.history_position);
