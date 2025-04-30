@@ -6,4 +6,5 @@ authors = ["P Deepanshun"]
 description = "Command handling for VoidCLI"
 
 [dependencies]
+serde = "1.0.219"
 
