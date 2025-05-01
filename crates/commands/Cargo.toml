@@ -7,4 +7,5 @@ description = "Command handling for VoidCLI"
 
 [dependencies]
 serde = "1.0.219"
+time = "0.3.41"
 

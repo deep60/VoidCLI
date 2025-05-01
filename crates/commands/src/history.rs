@@ -1,5 +1,4 @@
-use serde::{Deserialize, Serialize};
-use std::fs::File;
+use serde::{Deserialize, Serialize}
 
 ///A command history entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,5 +21,16 @@ impl HistoryEntry {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
+
+        let working_dir = std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        Self {
+            command: command.to_string(),
+            timestamp,
+            exit_code: None,
+            duration_ms: None,
+        }
     }
 }
