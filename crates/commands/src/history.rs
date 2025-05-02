@@ -1,4 +1,31 @@
-use serde::{Deserialize, Serialize}
+use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct History {
+    entries: Vec<HistoryEntry>,
+    max_entries: usize,
+}
+
+impl History {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: 1000,
+        }
+    }
+
+    pub fn add(&mut self, command: &str) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(HistoryEntry::new(command));
+    }
+
+    pub fn get_entries(&self) -> &[HistoryEntry] {
+        &self.entries
+    }
+}
 
 ///A command history entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +56,7 @@ impl HistoryEntry {
         Self {
             command: command.to_string(),
             timestamp,
+            working_dir,
             exit_code: None,
             duration_ms: None,
         }
