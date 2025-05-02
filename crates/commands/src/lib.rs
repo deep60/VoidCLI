@@ -6,6 +6,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+mod history;
+mod completion;
+mod suggestions;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandSuggestion {
     pub command: String,
