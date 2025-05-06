@@ -1,264 +1,174 @@
-use std::fmt::Debug;
+use core::error;
+use std::{
+    fmt::format,
+    io::Write,
+    process::{Child, Stdio},
+    sync::mpsc,
+};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
-pub struct TerminalParser {
-    //parser State
-    state: ParserState,
-    //current escape sequence being built
-    escape_buffer: Vec<u8>,
-    //Max size of escape buffer to prevent overflow
-    max_escape_len: usize,
+use crate::TermEvent;
+
+// manages a terminal process
+pub struct ProcessManager {
+    /// The child process
+    child: Option<Child>,
+    /// The shell command to run
+    shell: String,
+    /// Event Sender for process events
+    event_sender: mpsc::Sender<TermEvent>,
+    /// Working directory
+    working_directory: String,
+    ///Environment variables
+    env_vars: Vec<(String, String)>,
 }
 
-//Enum representing different parser states
-enum ParserState {
-    ///Normal processing state
-    Normal,
-    /// processing an escape sequence
-    Escape,
-    /// Processing an OSC(Operating System Command)
-    Osc,
-    /// Processing a CSI(Control sequence Introducer)
-    Csi,
-}
+impl ProcessManager {
+    // Create a new process manager
+    pub fn new(
+        shell: &str,
+        event_sender: mpsc::Sender<TermEvent>,
+        working_directory: Option<&str>,
+        env_vars: Vec<(String, String)>,
+    ) -> Self {
+        let working_directory = working_directory.map(|s| s.to_string()).unwrap_or_else(|| {
+            std::env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| "/".to_string())
+        });
 
-impl TerminalParser {
-    // Create a new terminal parser
-    pub fn new() -> Self {
         Self {
-            state: ParserState::Normal,
-            escape_buffer: Vec::with_capacity(128),
-            max_escape_len: 1024,
+            child: None,
+            shell: shell.to_string(),
+            event_sender,
+            working_directory,
+            env_vars,
         }
     }
 
-    //Parser terminal output data
-    // Returns processed data and actions to perform
-    pub fn parse(&mut self, data: &[u8]) -> Result<Vec<TerminalAction>> {
-        let mut actions = Vec::new();
+    /// Spawn a new process
+    pub async fn spawn(&mut self) -> Result<()> {
+        // Create a pseudo-terminal
+        let pty = crate::pty::PtyPair::new()?;
 
-        for &byte in data {
-            match self.state {
-                ParserState::Normal => {
-                    match byte {
-                        // ESC character
-                        0x1b => {
-                            self.escape_buffer.clear();
-                            self.escape_buffer.push(byte);
-                            self.state = ParserState::Escape;
-                        },
+        // Set up the command
+        let mut command = TokioCommand::new(&self.shell);
+        command.current_dir(&self.working_directory);
 
-                        // Handle other control characters
-                        0x07 => actions.push(TerminalAction::Bell),
-                        0x08 => actions.push(TerminalAction::Backspace),
-                        0x09 => actions.push(TerminalAction::Tab),
-                        0x0A => actions.push(TerminalAction::LineFeed),
-                        0x0D => actions.push(TerminalAction::CarriageReturn),
-                        // Normal printable character
-                        _ => actions.push(TerminalAction::Print(byte)),
+        // Add environment variables
+        for (key, value) in &self.env_vars {
+            command.env(key, value);
+        }
+
+        // Standard environment variables
+        command.env("TERM", "xterm-256color");
+
+        // Connect the command to our party
+        #[cfg(unix)]
+        {
+            command.stdin(Stdio::from(pty.slave.as_raw_fd()));
+            command.stdout(Stdio::from(pty.slave.as_raw_fd()));
+            command.stderr(Stdio::from(pty.slave.as_raw_fd()));
+        }
+
+        #[cfg(windows)]
+        {
+            // Window implementation would be different
+            // This is a placeholder
+            command.stdin(Stdio::piped());
+            command.stdout(Stdio::piped());
+            command.stderr(Stdio::piped());
+        }
+
+        // Spawn the process
+        let mut child = command.spawn().context("Failed to spawn process")?;
+
+        // Set up output handling
+        let mut master = pty.master;
+        let event_sender = self.event_sender.clone();
+
+        // Spawn a task to handle process output
+        tokio::spawn(async move {
+            let mut buffer = vec![0u8; 4096];
+
+            loop {
+                match master.read(&mut buffer).await {
+                    Ok(0) => {
+                        // EOF - process has terminated
+                        break;
                     }
-                },
-                ParserState::Escape => {
-                    self.escape_buffer.push(byte);
-                    match byte {
-                        // OSC - Operating System Command
-                        b']' => {
-                            self.state = ParserState::Osc;
-                        },
-                        // CSI - Control Sequence Introducer
-                        b'[' => {
-                            self.state = ParserState::Csi;
-                        },
-
-                        //Other escape sequences
-                        - => {
-                            // Process simple escape sequence
-                            if let Some(action) = self.process_simple_escape_sequence() {
-                                actions.push(action);
-                            }
-                            self.state = ParserState::Normal;
+                    Ok(n) => {
+                        // Send the output to the event handler
+                        let output_data = buffer[0..n].to_vec();
+                        if let Err(_) = event_sender.send(TermEvent::Output(output_data)).await {
+                            break;
                         }
                     }
-                },
 
-                ParserState::Csi => {
-                    self.escape_buffer.push(byte);
-
-                    // End of CSI sequence
-                    if byte >= 0x40 && byte <= 0x7E {
-                        if let Some(action) = self.process_csi_sequence() {
-                            actions.push(action);
-                        }
-                        self.state = ParserState::Normal;
-                    }
-
-                    // Safety check for malformed sequences
-                    if self.escape_buffer.len() > self.max_escape_len {
-                        self.state = ParserState::Normal;
-                    }
-                },
-
-                ParserState::Osc => {
-                    self.escape_buffer.:push(byte);
-
-                    // End of OSC sequence (BEL or ST)
-                    if byte == 0x07 || (byte == 0x5c && self.escape_buffer.len() >= 2 && self.escape_buffer[self.escape_buffer.len() - 2] == 0x1b) {
-                       if let Some(action) = self.process_osc_sequence() {
-                           actions.push(action);
-                       }
-                       self.state = ParserState::Normal;
-                    }
-
-                    // Safety check for malformed sequences
-                    if self.escape_buffer.len() > self.max_escape_len {
-                        self.state = ParserState::Normal;
+                    Err(e) => {
+                        let error_msg = format!("Error reading from process: {}", e);
+                        let _ = event_sender.send(TermEvent::Error(error_msg)).await;
+                        break;
                     }
                 }
             }
-        }
 
-        Ok(actions)
+            // Process has terminated
+            if let Ok(status) = child.wait().await {
+                let code = status.code().unwrap_or(-1);
+                let _ = event_sender.send(TermEvent::ProcessExit(code)).await;
+            }
+        });
+
+        self.child = Some(child);
+        Ok(())
     }
 
-    fn process_simple_escape_sequence(&self) -> Option<TerminalAction> {
-        if self.escape_buffer.len() < 2 {
-            return None;
+    /// Write data to the process
+    pub async fn write(&mut self, data: &[u8]) -> Result<()> {
+        if let Some(child) = &mut self.child {
+            if let Some(stdin) = &mut child.stdin {
+                stdin.write_all(data).await?;
+                stdin.flush().await?;
+            }
         }
 
-        match self.escape_buffer[1] {
-            b'A' => Some(TerminalAction::CursorUp(1)),
-            b'B' => Some(TerminalAction::CursorDown(1)),
-            b'C' => Some(TerminalAction::CursorForward(1)),
-            b'D' => Some(TerminalAction::CursorBackward(1)),
-            b'E' => Some(TerminalAction::CursorNextLine(1)),
-            b'F' => Some(TerminalAction::CursorPerviousLine(1)),
-            b'H' => Some(TerminalAction::CursorPosition(1, 1)),
-            b'J' => Some(TerminalAction::EraseInDisplay(0)),
-            b'K' => Some(TerminalAction::EraseInLine(0)),
-            b'M' => Some(TerminalAction::ScrollUp(1)),
-            b'c' => Some(TerminalAction::Reset),
-            _ => None,
-        }
+        Ok(())
     }
 
-    fn process_csi_sequence(&self) -> Option<TerminalAction> {
-        if self.escape_buffer.len() < 3 {
-            return None;
+    // Resize the terminal
+    pub async fn resize(&mut self, cols: u16, rows: u16) -> Result<()> {
+        // This would use the PTY resize functionality
+        // A placeholder for now
+        #[cfg(unix)]
+        if let Some(_) = &mut self.child {
+            // Here we would use the winsize struct from libc
         }
 
-        let final_byte = *self.escape_buffer.last()?;
-        let params_str = String::from_utf8_lossy(&self.escape_buffer[2..(self.escape_buffer.len() - 1)]);
-        let params: Vec<u32> = params_str.split(';').filter_map(|s| s.parse()::<u32>().ok()).collect();
-        match final_byte {
-            b'm' => Some(TerminalAction::SetGraphicRenditions(params)),
-            b'H' | b'f' => {
-                let row = params.get(0).copied().unwrap_or(1);
-                let col = params.get(1).copied().unwrap_or(1);
-                Some(TerminalAction::CursorPosition(row, col))
-            },
-            b'J' => Some(TerminalAction::EraseInDisplay(params.get(0).copied().unwrap_or(0))),
-            b'K' => Some(TerminalAction::EraseInLine(params.get(0).copied().unwrap_or(0))),
-            b'A' => Some(TerminalAction::CursorUp(params.get(0).copied().unwrap_or(1))),
-            b'B' => Some(TerminalAction::CursorDown(params.get(0).copied().unwrap_or(1))),
-            b'C' => Some(TerminalAction::CursorForward(params.get(0).copied().unwrap_or(1))),
-            b'D' => Some(TerminalAction::CursorBackward(params.get(0).copied().unwrap_or(1))),
-            _ => None,
-        }
+        Ok(())
     }
 
-    fn process_osc_sequence(&self) -> Option<TerminalAction> {
-        if self.escape_buffer.len() < 4 {
-            return None;
-        }
-
-        let osc_data = String::from_utf8_lossy(&self.escape_buffer[2..(self.escape_buffer.len() - 1)]);
-
-        if let Some(semicolon_pos) = osc_data.find(';') {
-            let cmd = &osc_data[..semicolon_pos];
-            let args = &osc_data[(semicolon_pos + 1)..];
-
-            match cmd {
-                "0" | "2" => Some(TerminalAction::SetWindowTitle(args.to_string())),
-                "4" => {
-                    // Color palette change
-                    if let Some((color_index, color_value)) = args.split_once(';') {
-                        if let (Ok(index), Some(color)) = (color_index.parse::<u8>(), Some(color_value.to_string())) {
-                            return Some(TerminalAction::SetColorPalette(index, color));
-                        }
-                    }
-                    None
-                },
-                _ => None,
+    /// kill the process
+    pub async fn kill(&mut self) -> Result<()> {
+        if let Some(child) = &mut self.child {
+            match child.try_wait() {
+                Ok(None) => true,     // Still running
+                Ok(Some(_)) => false, // exited
+                Err(_) => false,      // some error
             }
         } else {
-            None
+            false
         }
     }
-}
 
-/// Terminal actions that can be performed based on parsed terminal output
-#[derive(Debug)]
-pub enum TerminalAction {
-   /// Print a character to the terminal
-   Print(u8),
-   Bell,
-   Backspace,
-   Tab,
-   LineFeed,
-   CarriageReturn,
-   CursorUp(u32),
-   CursorDown(u32),
-   CursorForward(u32),
-   CursorBackward(u32),
-   CursorNextLine(u32),
-   CursorPerviousLine(u32),
-   CursorPosition(u32),
-   EraseInLine(u32),
-   EraseInDisplay(u32),
-   SetGraphicRenditions(Vec<u32>),
-   Reset,
-   ScrollUp(u32),
-   SetWindowTitle(String),
-   SetColorPalette(u8, String),
-}
-
-impl Default for TerminalParser {
-    fn default() -> Self {
-        Self::new()
+    // Set working directory
+    pub fn set_working_directory(&mut self, dir: &str) {
+        self.working_directory = dir.to_string();
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use core::panic;
-
-    use super::*;
-
-    #[test]
-    fn test_basic_character_parsing() {
-        let mut parser = TerminalParser::new();
-        let actions = parser.parse(b"Hello").unwrap();
-
-        assert_eq!(actions.len(), 5);
-        if let TerminalAction::Print(b'H') = actions[0] {
-            //Good
-        } else {
-            panic!("Expected Print('H') action");
-        }
-    }
-    
-    #[test]
-    fn test_csi_sequence() {
-        let mut parser = TerminalParser::new();
-        // ESC[1;31m - Set text color to red
-        let actions = parser.parse(b"\x1b[1;31m").unwrap();
-        
-        assert_eq!(actions.len(), 1);
-        if let TerminalAction::SetGraphicsRendition(params) = &actions[0] {
-            assert_eq!(params, &[1, 31]);
-        } else {
-            panic!("Expected SetGraphicsRendition action");
-        }
+    /// Add environment variables
+    pub fn add_env_var(&mut self, key: &str, value: &str) {
+        self.env_vars.push((key.to_string(), value.to_string()));
     }
 }
