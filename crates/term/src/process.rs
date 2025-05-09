@@ -1,5 +1,4 @@
 use std::{
-    io::Write,
     process::Stdio,
     sync::mpsc,
     os::unix::io::{AsRawFd, OwnedFd, FromRawFd},
@@ -91,6 +90,9 @@ impl ProcessManager {
         // Set up output handling
         let mut master = pty.master;
         let event_sender = self.event_sender.clone();
+        let mut child_stdin = child.stdin.take();
+        let mut child_stdout = child.stdout.take();
+        let mut child_stderr = child.stderr.take();
 
         // Spawn a task to handle process output
         tokio::spawn(async move {
@@ -123,6 +125,11 @@ impl ProcessManager {
                 let _ = event_sender.send(TermEvent::ProcessExit(code));
             }
         });
+
+        // Restore the child's stdin/stdout/stderr
+        child.stdin = child_stdin;
+        child.stdout = child_stdout;
+        child.stderr = child_stderr;
 
         self.child = Some(child);
         Ok(())
