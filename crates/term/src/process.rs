@@ -96,6 +96,9 @@ impl ProcessManager {
         // Create a channel for process status
         let (status_tx, status_rx) = oneshot::channel();
 
+        // Store the child process first
+        self.child = Some(child);
+
         // Spawn a task to handle process output
         tokio::spawn(async move {
             let mut buffer = vec![0u8; 4096];
@@ -122,20 +125,13 @@ impl ProcessManager {
             }
 
             // Process has terminated
-            if let Ok(status) = child.wait().await {
-                let code = status.code().unwrap_or(-1);
-                let _ = event_sender.send(TermEvent::ProcessExit(code));
-                let _ = status_tx.send(code);
-            }
+            let _ = status_tx.send(());
         });
-
-        // Store the child process
-        self.child = Some(child);
 
         // Wait for the process to exit in the background
         tokio::spawn(async move {
-            if let Ok(code) = status_rx.await {
-                info!("Process exited with code: {}", code);
+            if let Ok(()) = status_rx.await {
+                info!("Process output stream closed");
             }
         });
 
@@ -175,8 +171,10 @@ impl ProcessManager {
                     child.kill().await?;
                     Ok(())
                 }
-                Ok(Some(_)) => {
+                Ok(Some(status)) => {
                     // Already exited
+                    let code = status.code().unwrap_or(-1);
+                    let _ = self.event_sender.send(TermEvent::ProcessExit(code));
                     Ok(())
                 }
                 Err(e) => Err(e.into()),
