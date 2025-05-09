@@ -1,4 +1,4 @@
-use std::{char, collections::HashMap, fmt::format, usize};
+use std::{cell::Cell, char, collections::HashMap, fmt::format, usize};
 use anyhow::Result;
 
 use crate::parser::TerminalAction;
@@ -370,7 +370,7 @@ impl VirtualTerminal {
 
         let mut i = 0;
         while i < params.len() {
-            0 => {
+            0 >= {
                 // Reset all attributes
                 self.current_attributes = CellAttributes::default();
             }
@@ -544,6 +544,154 @@ impl VirtualTerminal {
 
         i += 1;
      }
+
+    /// Put a character at the current cursor position and advance cursor
+    fn put_char(&mut self, c: char) {
+        if c == '\n' {
+            // Line feed
+            self.process_action(&TerminalAction::LineFeed).unwrap();
+            return;
+        } else if c == '\r' {
+            self.process_action(&TerminalAction::CarriageReturn).unwrap();
+            return;
+        } else if c == '\t' {
+            // Tab
+            self.process_action(&TerminalAction::Tab).unwrap();
+            return;
+        } else if c == '\x08' {
+            // Backspace
+            self.process_action(&TerminalAction::Backspace).unwrap();
+            return;
+        } else if c == '\x07' {
+            self.process_action(&TerminalAction::Bell).unwrap();
+            return;
+        }
+
+        // Put character at current position
+        if self.cursor_row < self.rows && self.cursor_col < self.cols {
+            self.grid[self.cursor_row][self.cursor_col] = Cell {
+                character: c,
+                attributes: self.current_attributes.clone(),
+            };
+        }
+
+        // Advance cursor
+        self.cursor_col += 1;
+        if self.cursor_col >= self.cols {
+            self.cursor_col = 0;
+            self.cursor_row += 1;
+            if self.cursor_row > self.scroll_region.1 {
+                self.scroll_up(1);
+                self.cursor_row = self.scroll_region.1;
+            }
+        }
+    }
+
+    fn erase_region(&mut self, start_row: usize, start_col: usize, end_row: usize, end_col: usize) {
+        let start_row = start_row.min(self.rows - 1);
+        let start_col = start_col.min(self.cols - 1);
+        let end_row = end_row.min(self.rows - 1);
+        let end_col = end_col.min(self.cols - 1);
+
+        for row in start_row..= end_row {
+            let col_start = if row == start_row { start_col } else { 0 };
+            let col_end = if row == end_row {
+                end_col
+            } else {
+                self.cols - 1
+            };
+
+            for col in col_start..= col_end {
+                self.grid[row][col] = Cell {
+                    character: ' ',
+                    attributes: self.current_attributes.clone(),
+                };
+            }
+        }
+    }
+
+    /// Scroll the screen up by n lines
+    fn scroll_up(&mut self, n: usize) {
+        let (top, bottom) = self.scroll_region;
+        let n = n.min(bottom - top + 1);
+
+        if n == 0 {
+            return;
+        }
+
+        // Move all lines up
+        for row in top..(bottom + 1 - n)  {
+            for col in 0..self.cols {
+                self.grid[row][col] = self.grid[row + n][col].clone();
+            }
+        }
+
+        // Clear the bottom n lines
+        for row in (bottom + 1 - n)..= bottom {
+            for col in 0..self.cols {
+                self.grid[row][col] = Cell {
+                    character: ' ',
+                    attributes: self.current_attributes.clone(),
+                };
+            }
+        }
+    }
+
+    /// Switch to alternate screen buffer
+    pub fn use_alternate_buffer(&mut self, enable: bool) {
+        if enable != self.alt_buffer_active {
+            if enable {
+                // Switch to alternate buffer
+                let mut alt_grid = Vec::with_capacity(self.rows);
+                for _ in 0..self.rows {
+                    let mut row = Vec::with_capacity(self.cols);
+                    for _ in 0..self.cols {
+                        row.push(Cell::default());
+                    }
+                    alt_grid.push(row);
+                }
+                self.main_grid = Some(std::mem::replace(&mut self.grid, alt_grid));
+            } else {
+                // Switch back to main buffer
+                if let Some(main_grid) = self.main_grid.take() {
+                    self.grid = main_grid;
+                }
+            }
+            self.alt_buffer_active = enable;
+        }
+    }
+
+    /// Get the current cell at the specified position
+    pub fn get_cell(&self, rows: usize, col: usize) -> Option<&Cell> {
+        if row < self.rows && col < self.cols {
+            Some(&self.grid[row][col])
+        } else {
+            None
+        }
+    }
+
+    /// Get cursor position
+    pub fn get_cursor_position(&self) -> (usize, usize) {
+        (self.cursor_row, self.cursor_col)
+    }
+
+    /// Get a color from the palette
+    pub fn get_color(&self, index: u32) -> String {
+        // Check if this is an RGB color (flagged with 0x1000000)
+        if index & 0x1000000 != 0 {
+            let r = (index >> 16) & 0xFF;
+            let g = (index >> 8) & 0xFF;
+            let b = index & 0xFF;
+            return format!("#{:02X}{:02X}{:02X}", r, g, b);
+        }
+
+        let index = index as usize;
+        if index < self.color_palette.len() {
+            self.color_palette[index].clone()
+        } else {
+            "#FFFFFF".to_string()
+        }
+    }
 }
 
 
