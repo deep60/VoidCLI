@@ -4,11 +4,16 @@ use std::{
     io::Write,
     process::{Child, Stdio},
     sync::mpsc,
+    os::unix::io::AsRawFd,
 };
 
 use anyhow::{Context, Result};
+use tokio::{
+    process::Command as TokioCommand,
+    io::{AsyncWriteExt, AsyncReadExt},
+};
 
-use crate::TermEvent;
+use crate::{TermEvent, pty::PtyPair};
 
 // manages a terminal process
 pub struct ProcessManager {
@@ -50,7 +55,7 @@ impl ProcessManager {
     /// Spawn a new process
     pub async fn spawn(&mut self) -> Result<()> {
         // Create a pseudo-terminal
-        let pty = crate::pty::PtyPair::new()?;
+        let pty = PtyPair::new()?;
 
         // Set up the command
         let mut command = TokioCommand::new(&self.shell);
@@ -64,7 +69,7 @@ impl ProcessManager {
         // Standard environment variables
         command.env("TERM", "xterm-256color");
 
-        // Connect the command to our party
+        // Connect the command to our pty
         #[cfg(unix)]
         {
             command.stdin(Stdio::from(pty.slave.as_raw_fd()));
@@ -74,7 +79,7 @@ impl ProcessManager {
 
         #[cfg(windows)]
         {
-            // Window implementation would be different
+            // Windows implementation would be different
             // This is a placeholder
             command.stdin(Stdio::piped());
             command.stdout(Stdio::piped());
@@ -101,14 +106,13 @@ impl ProcessManager {
                     Ok(n) => {
                         // Send the output to the event handler
                         let output_data = buffer[0..n].to_vec();
-                        if let Err(_) = event_sender.send(TermEvent::Output(output_data)).await {
+                        if let Err(_) = event_sender.send(TermEvent::Output(output_data)) {
                             break;
                         }
                     }
-
                     Err(e) => {
                         let error_msg = format!("Error reading from process: {}", e);
-                        let _ = event_sender.send(TermEvent::Error(error_msg)).await;
+                        let _ = event_sender.send(TermEvent::Error(error_msg));
                         break;
                     }
                 }
@@ -117,7 +121,7 @@ impl ProcessManager {
             // Process has terminated
             if let Ok(status) = child.wait().await {
                 let code = status.code().unwrap_or(-1);
-                let _ = event_sender.send(TermEvent::ProcessExit(code)).await;
+                let _ = event_sender.send(TermEvent::ProcessExit(code));
             }
         });
 
@@ -129,8 +133,8 @@ impl ProcessManager {
     pub async fn write(&mut self, data: &[u8]) -> Result<()> {
         if let Some(child) = &mut self.child {
             if let Some(stdin) = &mut child.stdin {
-                stdin.write_all(data).await?;
-                stdin.flush().await?;
+                stdin.write_all(data)?;
+                stdin.flush()?;
             }
         }
 
@@ -138,7 +142,7 @@ impl ProcessManager {
     }
 
     // Resize the terminal
-    pub async fn resize(&mut self, cols: u16, rows: u16) -> Result<()> {
+    pub async fn resize(&mut self, _cols: u16, _rows: u16) -> Result<()> {
         // This would use the PTY resize functionality
         // A placeholder for now
         #[cfg(unix)]
@@ -153,12 +157,19 @@ impl ProcessManager {
     pub async fn kill(&mut self) -> Result<()> {
         if let Some(child) = &mut self.child {
             match child.try_wait() {
-                Ok(None) => true,     // Still running
-                Ok(Some(_)) => false, // exited
-                Err(_) => false,      // some error
+                Ok(None) => {
+                    // Still running, kill it
+                    child.kill()?;
+                    Ok(())
+                }
+                Ok(Some(_)) => {
+                    // Already exited
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
             }
         } else {
-            false
+            Ok(())
         }
     }
 

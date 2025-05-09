@@ -1,4 +1,4 @@
-use std::{cell::Cell, char, collections::HashMap, fmt::format, usize};
+use std::{cell::Cell as StdCell, char, collections::HashMap, fmt::format, usize};
 use anyhow::Result;
 
 use crate::parser::TerminalAction;
@@ -57,14 +57,14 @@ impl Default for CellAttributes {
 
 /// Represents a cell in the terminal grid
 #[derive(Debug, Clone)]
-pub struct Cell {
+pub struct TerminalCell {
     /// Character to display
     pub character: char,
     /// Cell attributes
     pub attributes: CellAttributes,
 }
 
-impl Default for Cell {
+impl Default for TerminalCell {
     fn default() -> Self {
         Self {
             character: ' ',
@@ -76,7 +76,7 @@ impl Default for Cell {
 /// Represent the terminal grid/buffer
 pub struct VirtualTerminal {
     /// The grid of cells
-    grid: Vec<Vec<Cell>>,
+    grid: Vec<Vec<TerminalCell>>,
     /// Terminal dimensions
     pub cols: usize,
     pub rows: usize,
@@ -99,7 +99,7 @@ pub struct VirtualTerminal {
     // Alternate screen buffer flag
     alt_buffer_active: bool,
     // main screen buffer (when alt is active)
-    main_grid: Option<Vec<Vec<Cell>>>,
+    main_grid: Option<Vec<Vec<TerminalCell>>>,
 }
 
 impl VirtualTerminal {
@@ -137,7 +137,7 @@ impl VirtualTerminal {
         for _ in 0..rows {
             let mut row = Vec::with_capacity(cols);
             for _ in 0..cols {
-                row.push(Cell::default());
+                row.push(TerminalCell::default());
             }
             grid.push(row);
         }
@@ -172,7 +172,7 @@ impl VirtualTerminal {
                     row.push(self.grid[i][j].clone());
                 } else {
                     // Fill with default cells
-                    row.push(Cell::default());
+                    row.push(TerminalCell::default());
                 }
             }
             new_grid.push(row);
@@ -370,180 +370,152 @@ impl VirtualTerminal {
 
         let mut i = 0;
         while i < params.len() {
-            0 >= {
-                // Reset all attributes
-                self.current_attributes = CellAttributes::default();
-            }
-
-            1 => {
-                // Bold
-                self.current_attributes.bold = true;
-            }
-
-            3 => {
-                // italic
-                self.current_attributes.italic = true;
-            }
-
-            4 => {
-                // underline
-                self.current_attributes.underline = true;
-            }
-
-            5 => {
-                // blink
-                self.current_attributes.blink = true;
-            }
-
-            7 => {
-                // reverse
-                self.current_attributes.reverse = true;
-            }
-
-            8 => {
-                // hidden
-                self.current_attributes.hidden = true;
-            }
-
-            9 => {
-                // strikethrough
-                self.current_attributes.strikethrough = true;
-            }
-
-            21 => {
-                // Double underline(or no bold, depending on terminal)
-                self.current_attributes.bold = false;
-            }
-
-            22 => {
-                // no bold
-                self.current_attributes.bold = false;
-            }
-
-            23 => {
-                // no italic
-                self.current_attributes.italic = false;
-            }
-
-            24 => {
-                // no underline
-                self.current_attributes.underline = false;
-            }
-
-            25 => {
-                // no blink
-                self.current_attributes.blink = false;
-            }
-
-            27 => {
-                // no reverse
-                self.current_attributes.reverse = false;
-            }
-
-            28 => {
-                self.current_attributes.hidden = false;
-            }
-
-            29 => {
-                self.current_attributes.strikethrough = false;
-            }
-
-            30..=37 => {
-                // Foreground color(8 colors)
-                self.current_attributes.fg_color = Some(params[i] - 30);
-            }
-
-            38 => {
-                // Extended Foreground color
-                if i + 1 < params.len() {
-                    match params[i + 1] {
-                        5 => {
-                            // 8-bit color (256 colors)
-                            if i + 2 < params.len() {
-                                self.current_attributes.fg_color = Some(params[i + 2]);
-                                i += 2;
-                            }
-                        }
-
-                        2 => {
-                            // 24-bit RGB colors
-                            if i +  4 < params.len() {
-                                // Convert RGB to a single integer
-                                let r = params[i + 2];
-                                let g = params[i + 3];
-                                let b = params[i + 4];
-                                let rgb = (r << 16) | (g << 8) | b;
-                                self.current_attributes.fg_color = Some(rgb | 0x1000000);
-                                i += 4;
-                            }
-                        }
-                         _ => {}
-                    }
-
-                    i += 1;
+            match params[i] {
+                0 => {
+                    // Reset all attributes
+                    self.current_attributes = CellAttributes::default();
                 }
-            }
-
-            39 => {
-                // Default Foreground colors
-                self.current_attributes.fg_color = Some(7);
-            }
-
-            40..=47 => {
-                // Background color (8 colors)
-                self.current_attributes.bg_color = Some(params[i] - 40);
-            }
-
-            48 => {
-                // Extended bg color
-                if i + 1 < params.len() {
-                    match params[i + 1] {
-                        5 => {
-                            // 8-bit color (256 color)
-                            if i + 2 < params.len() {
-                                self.current_attributes.bg_color = Some(params[i + 2]);
-                                i += 2;
-                            }
-                        }
-
-                        2 => {
-                            if i +  4 < params.len() {
-                                // Convert RGB to a single integer
-                                let r = params[i + 2];
-                                let g = params[i + 3];
-                                let b = params[i + 4];
-                                let rgb = (r << 16) | (g << 8) | b;
-                                self.current_attributes.fg_color = Some(rgb | 0x1000000);
-                                i += 4;
-                            }
-                        }
-
-                        _ => {}
-                    }
-
-                    i += 1;
+                1 => {
+                    // Bold
+                    self.current_attributes.bold = true;
                 }
+                3 => {
+                    // italic
+                    self.current_attributes.italic = true;
+                }
+                4 => {
+                    // underline
+                    self.current_attributes.underline = true;
+                }
+                5 => {
+                    // blink
+                    self.current_attributes.blink = true;
+                }
+                7 => {
+                    // reverse
+                    self.current_attributes.reverse = true;
+                }
+                8 => {
+                    // hidden
+                    self.current_attributes.hidden = true;
+                }
+                9 => {
+                    // strikethrough
+                    self.current_attributes.strikethrough = true;
+                }
+                21 => {
+                    // Double underline(or no bold, depending on terminal)
+                    self.current_attributes.bold = false;
+                }
+                22 => {
+                    // no bold
+                    self.current_attributes.bold = false;
+                }
+                23 => {
+                    // no italic
+                    self.current_attributes.italic = false;
+                }
+                24 => {
+                    // no underline
+                    self.current_attributes.underline = false;
+                }
+                25 => {
+                    // no blink
+                    self.current_attributes.blink = false;
+                }
+                27 => {
+                    // no reverse
+                    self.current_attributes.reverse = false;
+                }
+                28 => {
+                    self.current_attributes.hidden = false;
+                }
+                29 => {
+                    self.current_attributes.strikethrough = false;
+                }
+                30..=37 => {
+                    // Foreground color(8 colors)
+                    self.current_attributes.fg_color = Some(params[i] - 30);
+                }
+                38 => {
+                    // Extended Foreground color
+                    if i + 1 < params.len() {
+                        match params[i + 1] {
+                            5 => {
+                                // 8-bit color (256 colors)
+                                if i + 2 < params.len() {
+                                    self.current_attributes.fg_color = Some(params[i + 2]);
+                                    i += 2;
+                                }
+                            }
+                            2 => {
+                                // 24-bit RGB colors
+                                if i + 4 < params.len() {
+                                    // Convert RGB to a single integer
+                                    let r = params[i + 2];
+                                    let g = params[i + 3];
+                                    let b = params[i + 4];
+                                    let rgb = (r << 16) | (g << 8) | b;
+                                    self.current_attributes.fg_color = Some(rgb | 0x1000000);
+                                    i += 4;
+                                }
+                            }
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                }
+                39 => {
+                    // Default Foreground colors
+                    self.current_attributes.fg_color = Some(7);
+                }
+                40..=47 => {
+                    // Background color (8 colors)
+                    self.current_attributes.bg_color = Some(params[i] - 40);
+                }
+                48 => {
+                    // Extended bg color
+                    if i + 1 < params.len() {
+                        match params[i + 1] {
+                            5 => {
+                                // 8-bit color (256 color)
+                                if i + 2 < params.len() {
+                                    self.current_attributes.bg_color = Some(params[i + 2]);
+                                    i += 2;
+                                }
+                            }
+                            2 => {
+                                if i + 4 < params.len() {
+                                    // Convert RGB to a single integer
+                                    let r = params[i + 2];
+                                    let g = params[i + 3];
+                                    let b = params[i + 4];
+                                    let rgb = (r << 16) | (g << 8) | b;
+                                    self.current_attributes.fg_color = Some(rgb | 0x1000000);
+                                    i += 4;
+                                }
+                            }
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                }
+                49 => {
+                    // Default Background color
+                    self.current_attributes.bg_color = Some(0);
+                }
+                90..=97 => {
+                    // bright Background color
+                    self.current_attributes.fg_color = Some(params[i] - 90 + 8);
+                }
+                100..=107 => {
+                    self.current_attributes.bg_color = Some(params[i] - 100 + 8);
+                }
+                _ => {}
             }
-
-            49 => {
-                // Default Background color
-                self.current_attributes.bg_color = Some(0);
-            }
-
-            90..=97 => {
-                // bright Background color
-                self.current_attributes.fg_color = Some(params[i] - 90 + 8);
-            }
-
-            100..=107 => {
-                self.current_attributes.bg_color = Some(params[i] - 100 + 8);
-            }
-
-            _ => {}
+            i += 1;
         }
-
-        i += 1;
-     }
+    }
 
     /// Put a character at the current cursor position and advance cursor
     fn put_char(&mut self, c: char) {
@@ -569,7 +541,7 @@ impl VirtualTerminal {
 
         // Put character at current position
         if self.cursor_row < self.rows && self.cursor_col < self.cols {
-            self.grid[self.cursor_row][self.cursor_col] = Cell {
+            self.grid[self.cursor_row][self.cursor_col] = TerminalCell {
                 character: c,
                 attributes: self.current_attributes.clone(),
             };
@@ -602,7 +574,7 @@ impl VirtualTerminal {
             };
 
             for col in col_start..= col_end {
-                self.grid[row][col] = Cell {
+                self.grid[row][col] = TerminalCell {
                     character: ' ',
                     attributes: self.current_attributes.clone(),
                 };
@@ -629,7 +601,7 @@ impl VirtualTerminal {
         // Clear the bottom n lines
         for row in (bottom + 1 - n)..= bottom {
             for col in 0..self.cols {
-                self.grid[row][col] = Cell {
+                self.grid[row][col] = TerminalCell {
                     character: ' ',
                     attributes: self.current_attributes.clone(),
                 };
@@ -646,7 +618,7 @@ impl VirtualTerminal {
                 for _ in 0..self.rows {
                     let mut row = Vec::with_capacity(self.cols);
                     for _ in 0..self.cols {
-                        row.push(Cell::default());
+                        row.push(TerminalCell::default());
                     }
                     alt_grid.push(row);
                 }
@@ -662,7 +634,7 @@ impl VirtualTerminal {
     }
 
     /// Get the current cell at the specified position
-    pub fn get_cell(&self, rows: usize, col: usize) -> Option<&Cell> {
+    pub fn get_cell(&self, row: usize, col: usize) -> Option<&TerminalCell> {
         if row < self.rows && col < self.cols {
             Some(&self.grid[row][col])
         } else {

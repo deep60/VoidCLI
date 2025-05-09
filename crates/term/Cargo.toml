@@ -6,4 +6,9 @@ authors = ["P Deepanshun"]
 description = "Terminal functionality for VoidCLI"
 
 [dependencies]
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+nix = "0.26"
+libc = "0.2"
+config = "0.13"
 

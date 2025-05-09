@@ -1,18 +1,13 @@
 use anyhow::{Context, Result};
 use std::{
-    clone,
-    ffi::c_ushort,
-    fmt::write,
-    fs::write,
-    io::{Read, Write},
-    os::{
-        fd::{AsRawFd, RawFd},
-        raw::c_ushort,
-    },
+    io::{self, Read, Write},
+    os::unix::io::{AsRawFd, RawFd},
 };
-
-#[cfg(unix)]
-use nix::pty::{openpty, Winsize};
+use nix::{
+    pty::{openpty, Winsize},
+    unistd::{close, read, write},
+};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 /// A pair of master and slave PTY file descriptors
 #[cfg(unix)]
@@ -53,8 +48,8 @@ impl PtyPair {
     /// Create a new PTY pair with specified dimensions
     pub fn with_size(row: u16, cols: u16) -> Result<Self> {
         let ws = Winsize {
-            ws_row: rows as c_ushort,
-            ws_col: cols as c_ushort,
+            ws_row: row,
+            ws_col: cols,
             ws_xpixel: 0,
             ws_ypixel: 0,
         };
@@ -73,8 +68,8 @@ impl PtyMaster {
     /// Resize the PTY
     pub fn resize(&self, rows: u16, cols: u16) -> Result<()> {
         let ws = Winsize {
-            ws_row: rows as c_ushort,
-            ws_col: cols as c_ushort,
+            ws_row: rows,
+            ws_col: cols,
             ws_xpixel: 0,
             ws_ypixel: 0,
         };
@@ -123,7 +118,7 @@ impl Write for PtyMaster {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        // PTY doesn't buffer, so this is a no-up
+        // PTY doesn't buffer, so this is a no-op
         Ok(())
     }
 }
@@ -143,14 +138,12 @@ impl Drop for PtySlave {
 }
 
 #[cfg(unix)]
-impl tokio::io::AsyncRead for PtyMaster {
+impl AsyncRead for PtyMaster {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::Result<'_>,
+        _cx: &mut std::task::Context<'_>,
+        buf: &mut ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        // This is a bit of a hack, but it works for now
-        // In a real implementation, you'd want to use proper async I/O
         match read(self.fd, buf.initialize_unfilled()) {
             Ok(n) => {
                 buf.advance(n);
@@ -165,10 +158,10 @@ impl tokio::io::AsyncRead for PtyMaster {
 }
 
 #[cfg(unix)]
-impl tokio::io::AsyncWrite for PtyMaster {
+impl AsyncWrite for PtyMaster {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<std::io::Result<usize>> {
         match write(self.fd, buf) {
@@ -184,21 +177,21 @@ impl tokio::io::AsyncWrite for PtyMaster {
         self: std::pin::Pin<&mut Self>,
         _: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        std::task::Poll::Read(Ok(()))
+        std::task::Poll::Ready(Ok(()))
     }
 
     fn poll_shutdown(
         self: std::pin::Pin<&mut Self>,
         _: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        //Closing is handled by drop
+        // Closing is handled by drop
         std::task::Poll::Ready(Ok(()))
     }
 }
 
 #[cfg(windows)]
 pub struct PtyPair {
-    //Windows-specific fields
+    // Windows-specific fields
 }
 
 #[cfg(windows)]
