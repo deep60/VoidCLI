@@ -2458,6 +2458,7 @@ dependencies = [
  "anyhow",
  "config 0.13.4",
  "libc",
+ "log",
  "nix 0.26.4",
  "tokio",
 ]
