@@ -4,13 +4,13 @@ use std::{
     io::Write,
     process::{Child, Stdio},
     sync::mpsc,
-    os::unix::io::AsRawFd,
+    os::unix::io::{AsRawFd, OwnedFd},
 };
 
 use anyhow::{Context, Result};
 use tokio::{
     process::Command as TokioCommand,
-    io::{AsyncWriteExt, AsyncReadExt},
+    io::AsyncReadExt,
 };
 
 use crate::{TermEvent, pty::PtyPair};
@@ -18,7 +18,7 @@ use crate::{TermEvent, pty::PtyPair};
 // manages a terminal process
 pub struct ProcessManager {
     /// The child process
-    child: Option<Child>,
+    child: Option<tokio::process::Child>,
     /// The shell command to run
     shell: String,
     /// Event Sender for process events
@@ -72,9 +72,10 @@ impl ProcessManager {
         // Connect the command to our pty
         #[cfg(unix)]
         {
-            command.stdin(Stdio::from(pty.slave.as_raw_fd()));
-            command.stdout(Stdio::from(pty.slave.as_raw_fd()));
-            command.stderr(Stdio::from(pty.slave.as_raw_fd()));
+            let slave_fd = unsafe { OwnedFd::from_raw_fd(pty.slave.as_raw_fd()) };
+            command.stdin(Stdio::from(slave_fd.try_clone()?));
+            command.stdout(Stdio::from(slave_fd.try_clone()?));
+            command.stderr(Stdio::from(slave_fd));
         }
 
         #[cfg(windows)]
@@ -133,8 +134,8 @@ impl ProcessManager {
     pub async fn write(&mut self, data: &[u8]) -> Result<()> {
         if let Some(child) = &mut self.child {
             if let Some(stdin) = &mut child.stdin {
-                stdin.write_all(data)?;
-                stdin.flush()?;
+                stdin.write_all(data).await?;
+                stdin.flush().await?;
             }
         }
 
@@ -156,10 +157,10 @@ impl ProcessManager {
     /// kill the process
     pub async fn kill(&mut self) -> Result<()> {
         if let Some(child) = &mut self.child {
-            match child.try_wait() {
+            match child.try_wait().await {
                 Ok(None) => {
                     // Still running, kill it
-                    child.kill()?;
+                    child.kill().await?;
                     Ok(())
                 }
                 Ok(Some(_)) => {
