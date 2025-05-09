@@ -8,7 +8,9 @@ use anyhow::{Context, Result};
 use tokio::{
     process::Command as TokioCommand,
     io::{AsyncReadExt, AsyncWriteExt},
+    sync::oneshot,
 };
+use log::info;
 
 use crate::{TermEvent, pty::PtyPair};
 
@@ -90,9 +92,9 @@ impl ProcessManager {
         // Set up output handling
         let mut master = pty.master;
         let event_sender = self.event_sender.clone();
-        let mut child_stdin = child.stdin.take();
-        let mut child_stdout = child.stdout.take();
-        let mut child_stderr = child.stderr.take();
+
+        // Create a channel for process status
+        let (status_tx, status_rx) = oneshot::channel();
 
         // Spawn a task to handle process output
         tokio::spawn(async move {
@@ -123,15 +125,20 @@ impl ProcessManager {
             if let Ok(status) = child.wait().await {
                 let code = status.code().unwrap_or(-1);
                 let _ = event_sender.send(TermEvent::ProcessExit(code));
+                let _ = status_tx.send(code);
             }
         });
 
-        // Restore the child's stdin/stdout/stderr
-        child.stdin = child_stdin;
-        child.stdout = child_stdout;
-        child.stderr = child_stderr;
-
+        // Store the child process
         self.child = Some(child);
+
+        // Wait for the process to exit in the background
+        tokio::spawn(async move {
+            if let Ok(code) = status_rx.await {
+                info!("Process exited with code: {}", code);
+            }
+        });
+
         Ok(())
     }
 
