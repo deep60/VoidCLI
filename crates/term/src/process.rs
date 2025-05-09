@@ -1,16 +1,14 @@
-use core::error;
 use std::{
-    fmt::format,
     io::Write,
-    process::{Child, Stdio},
+    process::Stdio,
     sync::mpsc,
-    os::unix::io::{AsRawFd, OwnedFd},
+    os::unix::io::{AsRawFd, OwnedFd, FromRawFd},
 };
 
 use anyhow::{Context, Result};
 use tokio::{
     process::Command as TokioCommand,
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
 };
 
 use crate::{TermEvent, pty::PtyPair};
@@ -157,7 +155,7 @@ impl ProcessManager {
     /// kill the process
     pub async fn kill(&mut self) -> Result<()> {
         if let Some(child) = &mut self.child {
-            match child.try_wait().await {
+            match child.try_wait() {
                 Ok(None) => {
                     // Still running, kill it
                     child.kill().await?;
