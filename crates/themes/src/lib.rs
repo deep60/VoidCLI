@@ -10,84 +10,117 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
     pub name: String,
-    pub author: String,
-    pub colors: ColorScheme,
+    pub colors: ThemeColors,
+    pub styles: ThemeStyles,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorScheme {
+pub struct ThemeColors {
     pub background: String,
     pub foreground: String,
-    pub cursor: String,
-    pub selection: String,
-    pub black: String,
-    pub red: String,
-    pub green: String,
-    pub yellow: String,
-    pub blue: String,
-    pub magenta: String,
-    pub cyan: String,
-    pub white: String,
-    pub bright_black: String,
-    pub bright_red: String,
-    pub bright_green: String,
-    pub bright_yellow: String,
-    pub bright_blue: String,
-    pub bright_magenta: String,
-    pub bright_cyan: String,
-    pub bright_white: String,
+    pub accent: String,
+    pub error: String,
+    pub success: String,
+    pub warning: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThemeStyles {
+    pub font_family: String,
+    pub font_size: u32,
+    pub line_height: f32,
+    pub padding: u32,
+    pub border_radius: u32,
 }
 
 lazy_static! {
     static ref THEMES: HashMap<String, Theme> = {
-        let mut m = HashMap::new();
-
-        //Add default themes
-        m.insert("dark".to_string(), Theme {
-            name: "Dark".to_string(),
-            author: "VYZE".to_string(),
-            colors: ColorScheme {
-                background: "#282a36".to_string(),
-                foreground: "#f8f8f2".to_string(),
-                cursor: "#f8f8f2".to_string(),
-                selection: "#44475a".to_string(),
-                black: "#21222c".to_string(),
-                red: "#ff5555".to_string(),
-                green: " #50fa7b".to_string(),
-                yellow: "#f1f8ac".to_string(),
-                blue: "#bd93f9".to_string(),
-                magenta: "#ff79c6".to_string(),
-                cyan: "#8be9fd".to_string(),
-                white: "#f8f8f2".to_string(),
-                bright_black: "#6272a4".to_string(),
-                bright_red: "#ff6e6e".to_string(),
-                bright_green: "#69ff94".to_string(),
-                bright_yellow: "ffffa5".to_string(),
-                bright_blue: "#d6acff".to_string(),
-                bright_magenta: "#ff92df".to_string(),
-                bright_cyan: "#a4ffff".to_string(),
-                bright_white: "#ffffff".to_string(),
+        let mut themes = HashMap::new();
+        
+        // Default dark theme
+        themes.insert("dark".to_string(), Theme {
+            name: "dark".to_string(),
+            colors: ThemeColors {
+                background: "#1a1a1a".to_string(),
+                foreground: "#ffffff".to_string(),
+                accent: "#007acc".to_string(),
+                error: "#ff5555".to_string(),
+                success: "#50fa7b".to_string(),
+                warning: "#ffb86c".to_string(),
+            },
+            styles: ThemeStyles {
+                font_family: "monospace".to_string(),
+                font_size: 14,
+                line_height: 1.5,
+                padding: 8,
+                border_radius: 4,
             },
         });
-        //Add more items
-        m
+
+        // Default light theme
+        themes.insert("light".to_string(), Theme {
+            name: "light".to_string(),
+            colors: ThemeColors {
+                background: "#ffffff".to_string(),
+                foreground: "#000000".to_string(),
+                accent: "#007acc".to_string(),
+                error: "#ff0000".to_string(),
+                success: "#00ff00".to_string(),
+                warning: "#ffa500".to_string(),
+            },
+            styles: ThemeStyles {
+                font_family: "monospace".to_string(),
+                font_size: 14,
+                line_height: 1.5,
+                padding: 8,
+                border_radius: 4,
+            },
+        });
+
+        themes
     };
 }
 
-impl Theme {
-    pub fn from_name(name: &str) -> Option<Self> {
+pub struct ThemeManager {
+    current_theme: Theme,
+}
+
+impl ThemeManager {
+    pub fn new() -> Self {
+        Self {
+            current_theme: THEMES.get("dark").unwrap().clone(),
+        }
+    }
+
+    pub fn get_theme(&self, name: &str) -> Option<Theme> {
         THEMES.get(name).cloned()
     }
 
-    pub fn from_file(path: &str) -> Result<Self> {
+    pub fn load_theme_from_file(&mut self, path: &str) -> Result<()> {
         let contents = std::fs::read_to_string(path)?;
         let theme: Theme = serde_yaml::from_str(&contents)?;
-        Ok(theme)
+        self.current_theme = theme;
+        Ok(())
+    }
+
+    pub fn get_current_theme(&self) -> Theme {
+        self.current_theme.clone()
+    }
+
+    pub fn set_theme(&mut self, name: &str) -> Result<()> {
+        if let Some(theme) = THEMES.get(name) {
+            self.current_theme = theme.clone();
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Theme not found: {}", name))
+        }
     }
 }
 
-impl Default for Theme {
+impl Default for ThemeManager {
     fn default() -> Self {
-        THEMES.get("dark").unwrap().clone()
+        Self {
+            current_theme: THEMES.get("dark").unwrap().clone(),
+        }
     }
 }
