@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Result,
+    fmt::Result as FmtResult,
     intrinsics::compare_bytes,
 };
 
@@ -49,12 +49,11 @@ impl SuggestionEngine {
     }
 
     pub fn set_ai_suggestions(&mut self, enabled: bool) {
-        self.set_ai_suggestions = enabled;
+        self.ai_suggestions_enabled = enabled;
     }
 
     pub fn add_custom_suggestions(&mut self, command: &str, description: &str) {
-        self.add_custom_suggestions
-            .insert(command.to_string(), description.to_string());
+        self.custom_suggestions.insert(command.to_string(), description.to_string());
     }
 
     pub fn remove_custom_suggestions(&mut self, command: &str) -> bool {

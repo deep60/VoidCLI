@@ -6,10 +6,82 @@ use std::{
     io::Empty,
     os::{darwin::fs, unix::fs::PermissionsExt},
     path::PathBuf,
+    result::Result,
 };
 
 use anyhow::{Context, Ok};
 use serde::{Deserialize, Serialize};
+
+pub struct CommandCompletion {
+    cache: Vec<String>,
+    system_paths: Vec<PathBuf>,
+}
+
+impl CommandCompletion {
+    pub fn new() -> Self {
+        Self {
+            cache: Vec::new(),
+            system_paths: Vec::new(),
+        }
+    }
+
+    pub fn initialize_cache(&mut self) -> Result<(), anyhow::Error> {
+        // Get system paths from PATH environment variable
+        if let Some(path_var) = std::env::var("PATH").ok() {
+            self.system_paths = path_var
+                .split(':')
+                .map(PathBuf::from)
+                .collect();
+        }
+
+        // Scan system paths for executables
+        for path in &self.system_paths {
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        if let Ok(metadata) = entry.metadata() {
+                            if metadata.is_file() && metadata.permissions().mode() & 0o111 != 0 {
+                                if let Some(name) = entry.file_name().to_str() {
+                                    self.cache.push(name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn get_completions(&self, prefix: &str) -> Vec<String> {
+        self.cache
+            .iter()
+            .filter(|cmd| cmd.starts_with(prefix))
+            .cloned()
+            .collect()
+    }
+
+    pub fn scan_directory(&self, dir_path: &PathBuf) -> Vec<String> {
+        let mut completions = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(dir_path) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() && metadata.permissions().mode() & 0o111 != 0 {
+                            if let Some(name) = entry.file_name().to_str() {
+                                completions.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        completions
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Completion {
