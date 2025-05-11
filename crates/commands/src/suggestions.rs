@@ -1,13 +1,21 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Result as FmtResult,
-    intrinsics::compare_bytes,
-};
+use std::collections::HashMap;
 
-use crate::{CommandSuggestion, SuggestionSource};
-use anyhow::{Context, Ok, Result};
-use dirs::public_dir;
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
+
+#[derive(Debug, Clone)]
+pub struct CommandSuggestion {
+    pub command: String,
+    pub description: String,
+    pub source: SuggestionSource,
+}
+
+#[derive(Debug, Clone)]
+pub enum SuggestionSource {
+    History,
+    AI,
+    Custom,
+    Builtin,
+}
 
 /// Default built-in command suggestions
 const DEFAULT_SUGGESTIONS: &[(&str, &str)] = &[
@@ -25,9 +33,8 @@ const DEFAULT_SUGGESTIONS: &[(&str, &str)] = &[
     ("echo", "Display a line of text"),
 ];
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct SuggestionEngine {
-    // Add fields as needed
     builtin_suggestions: HashMap<String, String>,
     custom_suggestions: HashMap<String, String>,
     ai_suggestions_enabled: bool,
@@ -90,13 +97,13 @@ impl SuggestionEngine {
     }
 
     /// Get AI-powered suggestions (Placeholder for future implementation)
-    pub async fn get_ai_suggestions(&self, context: &str) -> Result<Vec<CommandSuggestion>> {
+    pub async fn get_ai_suggestions(&self, _context: &str) -> Result<Vec<CommandSuggestion>> {
         if !self.ai_suggestions_enabled {
             return Ok(Vec::new());
         }
 
         // This would normally call an AI service to get suggestions
-        // For now, reurn a Placeholder
+        // For now, return a placeholder
         Ok(vec![CommandSuggestion {
             command: "ai_suggestion".to_string(),
             description: "AI suggested command based on context".to_string(),

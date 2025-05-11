@@ -25,7 +25,7 @@ impl CommandCompletion {
         }
     }
 
-    pub fn initialize_cache(&mut self) -> Result<(), anyhow::Error> {
+    pub fn initialize_cache(&mut self) -> Result<()> {
         // Get system paths from PATH environment variable
         if let Some(path_var) = std::env::var("PATH").ok() {
             self.system_paths = path_var
@@ -36,10 +36,10 @@ impl CommandCompletion {
 
         // Scan system paths for executables
         for path in &self.system_paths {
-            if let Ok(entries) = fs::read_dir(path) {
+            if let Some(entries) = fs::read_dir(path).ok() {
                 for entry in entries {
-                    if let Ok(entry) = entry {
-                        if let Ok(metadata) = entry.metadata() {
+                    if let Some(entry) = entry.ok() {
+                        if let Some(metadata) = entry.metadata().ok() {
                             if metadata.is_file() && metadata.permissions().mode() & 0o111 != 0 {
                                 if let Some(name) = entry.file_name().to_str() {
                                     self.cache.push(name.to_string());
@@ -65,10 +65,10 @@ impl CommandCompletion {
     pub fn scan_directory(&self, dir_path: &PathBuf) -> Vec<String> {
         let mut completions = Vec::new();
 
-        if let Ok(entries) = fs::read_dir(dir_path) {
+        if let Some(entries) = fs::read_dir(dir_path).ok() {
             for entry in entries {
-                if let Ok(entry) = entry {
-                    if let Ok(metadata) = entry.metadata() {
+                if let Some(entry) = entry.ok() {
+                    if let Some(metadata) = entry.metadata().ok() {
                         if metadata.is_file() && metadata.permissions().mode() & 0o111 != 0 {
                             if let Some(name) = entry.file_name().to_str() {
                                 completions.push(name.to_string());
