@@ -1,16 +1,10 @@
-use core::str;
 use std::{
-    collections::HashSet,
-    fmt::format,
     fs,
-    io::Empty,
-    os::{darwin::fs, unix::fs::PermissionsExt},
+    os::unix::fs::PermissionsExt,
     path::PathBuf,
-    result::Result,
 };
 
-use anyhow::{Context, Ok};
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
 
 pub struct CommandCompletion {
     cache: Vec<String>,
@@ -83,17 +77,16 @@ impl CommandCompletion {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Completion {
-    // Add fields as needed
     system_paths: Vec<PathBuf>,
-    command_cahe: HashSet<String>,
+    command_cache: Vec<String>,
     cache_initialized: bool,
 }
 
 impl Completion {
     pub fn new() -> Self {
-        let system_paths = if let Ok(path_var) = std::env::var("PATH") {
+        let system_paths = if let Some(path_var) = std::env::var("PATH").ok() {
             std::env::split_paths(&path_var).collect()
         } else {
             Vec::new()
@@ -101,44 +94,42 @@ impl Completion {
 
         Self {
             system_paths,
-            command_cahe: HashSet::new(),
+            command_cache: Vec::new(),
             cache_initialized: false,
         }
     }
 
     pub fn initialize_cache(&mut self) -> Result<()> {
-        // Placeholder implementation
         if self.cache_initialized {
             return Ok(());
         }
 
         for path in &self.system_paths {
             if path.exists() && path.is_dir() {
-                let entries = fs::read_dir(path)
-                    .with_context(|| format!("Failed to read directory: {}", path.display()))?;
+                if let Some(entries) = fs::read_dir(path).ok() {
+                    for entry in entries {
+                        if let Some(entry) = entry.ok() {
+                            let path = entry.path();
 
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        let path = entry.path();
+                            if path.is_dir() {
+                                continue;
+                            }
 
-                        if path.is_dir() {
-                            continue;
-                        }
+                            #[cfg(unix)]
+                            let executable = fs::metadata(&path)
+                                .map(|meta| meta.permissions().mode() & 0o111 != 0)
+                                .unwrap_or(false);
 
-                        #[cfg(unix)]
-                        let executable = fs::metadata(&path)
-                            .map(|meta| meta.permissions().mode() & 0o111 != 0)
-                            .unwrap_or(false);
+                            #[cfg(not(unix))]
+                            let executable = path
+                                .extension()
+                                .map_or(false, |ext| ext == "exe" || ext == "bat" || ext == "cmd");
 
-                        #[cfg(not(unix))]
-                        let executable = path
-                            .extension()
-                            .map_or(false, |ext| ext == "exe" || ext == "bat" || ext == "cmd");
-
-                        if executable {
-                            if let Some(name) = path.file_name() {
-                                if let Some(name_str) = name.to_str() {
-                                    self.command_cahe.insert(name_str.to_string());
+                            if executable {
+                                if let Some(name) = path.file_name() {
+                                    if let Some(name_str) = name.to_str() {
+                                        self.command_cache.push(name_str.to_string());
+                                    }
                                 }
                             }
                         }
@@ -156,7 +147,7 @@ impl Completion {
             let _ = self.initialize_cache();
         }
 
-        self.command_cahe
+        self.command_cache
             .iter()
             .filter(|cmd| cmd.starts_with(partial))
             .cloned()
@@ -181,21 +172,23 @@ impl Completion {
             (PathBuf::from("."), partial.to_string())
         };
 
-        if let Ok(entries) = fs::read_dir(&dir_path) {
-            for entry in entries.flatten() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if name.starts_with(&prefix) {
-                        let mut path = if dir_path == PathBuf::from(".") {
-                            name.to_string()
-                        } else {
-                            format!("{}/{}", dir_path.display(), name)
-                        };
+        if let Some(entries) = fs::read_dir(&dir_path).ok() {
+            for entry in entries {
+                if let Some(entry) = entry.ok() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        if name.starts_with(&prefix) {
+                            let mut path = if dir_path == PathBuf::from(".") {
+                                name.to_string()
+                            } else {
+                                format!("{}/{}", dir_path.display(), name)
+                            };
 
-                        if entry.path().is_dir() {
-                            path.push('/');
+                            if entry.path().is_dir() {
+                                path.push('/');
+                            }
+
+                            results.push(path);
                         }
-
-                        results.push(path);
                     }
                 }
             }
