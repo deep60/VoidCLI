@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use config::Config;
 use themes::Theme;
-use wgpu::{Device, Queue, Surface};
+use wgpu::{Adapter, Device, Queue, Surface};
 use winit::window::Window;
 
 pub struct Renderer<'a> {
@@ -9,6 +9,7 @@ pub struct Renderer<'a> {
     device: Option<Device>,
     queue: Option<Queue>,
     surface: Option<Surface<'a>>,
+    adapter: Option<Adapter>,
     theme: Theme,
 }
 
@@ -19,6 +20,7 @@ impl<'a> Renderer<'a> {
             device: None,
             queue: None,
             surface: None,
+            adapter: None,
             theme,
         }
     }
@@ -56,6 +58,7 @@ impl<'a> Renderer<'a> {
         self.device = Some(device);
         self.queue = Some(queue);
         self.surface = Some(surface);
+        self.adapter = Some(adapter);
 
         Ok(())
     }
@@ -105,8 +108,12 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if let (Some(device), Some(surface)) = (&self.device, &self.surface) {
-            let format = surface.get_capabilities(device).formats[0];
+        if let (Some(device), Some(surface), Some(adapter)) = (
+            &self.device,
+            &self.surface,
+            &self.adapter,
+        ) {
+            let format = surface.get_capabilities(adapter).formats[0];
 
             surface.configure(
                 device,
