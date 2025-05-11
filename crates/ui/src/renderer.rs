@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use config::Config;
 use themes::Theme;
 use wgpu::{Device, Queue, Surface};
@@ -23,27 +23,35 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    pub async fn initialize(&mut self, window: &Window) -> Result<(), wgpu::Error> {
+    pub async fn initialize(&mut self, window: &'a Window) -> Result<()> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
 
-        let surface = unsafe { instance.create_surface(window) }?;
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        }).await?;
+        let surface = instance.create_surface(window)
+            .context("Failed to create surface")?;
 
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: None,
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
-            },
-            None,
-        ).await?;
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .context("Failed to find an appropriate adapter")?;
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                },
+                None,
+            )
+            .await
+            .context("Failed to create device")?;
 
         self.device = Some(device);
         self.queue = Some(queue);
@@ -52,13 +60,15 @@ impl<'a> Renderer<'a> {
         Ok(())
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::Error> {
+    pub fn render(&mut self) -> Result<()> {
         if let (Some(device), Some(queue), Some(surface)) = (
             &self.device,
             &self.queue,
             &self.surface,
         ) {
-            let frame = surface.get_current_texture()?;
+            let frame = surface
+                .get_current_texture()
+                .context("Failed to acquire next swap chain texture")?;
             let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
             let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -66,7 +76,7 @@ impl<'a> Renderer<'a> {
             });
 
             {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: &view,
@@ -78,10 +88,12 @@ impl<'a> Renderer<'a> {
                                 b: 0.3,
                                 a: 1.0,
                             }),
-                            store: true,
+                            store: wgpu::StoreOp::Store,
                         },
                     })],
                     depth_stencil_attachment: None,
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
                 });
             }
 
@@ -94,16 +106,19 @@ impl<'a> Renderer<'a> {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         if let (Some(device), Some(surface)) = (&self.device, &self.surface) {
+            let format = surface.get_capabilities(device).formats[0];
+
             surface.configure(
                 device,
                 &wgpu::SurfaceConfiguration {
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    format: surface.get_supported_formats(device)[0],
+                    format,
                     width,
                     height,
                     present_mode: wgpu::PresentMode::Fifo,
                     alpha_mode: wgpu::CompositeAlphaMode::Auto,
                     view_formats: vec![],
+                    desired_maximum_frame_latency: 2,
                 },
             );
         }

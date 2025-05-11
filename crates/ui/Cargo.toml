@@ -8,4 +8,4 @@ anyhow = "1.0"
 config = { path = "../config" }
 themes = { path = "../themes" }
 winit = "0.29"
-wgpu = "0.18"
+wgpu = "0.19"
