@@ -10,13 +10,13 @@ pub enum Event {
 }
 
 pub struct EventLoop {
-    state: Arc<Mutex<AppState>>,
-    event_rx: mpsc::Receiver<Event>,
+    _state: Arc<Mutex<AppState>>,
+    _event_rx: mpsc::Receiver<Event>,
 }
 
 impl EventLoop {
     pub fn new(state: Arc<Mutex<AppState>>, event_rx: mpsc::Receiver<Event>) -> Self {
-        Self { state, event_rx }
+        Self { _state: state, _event_rx: event_rx }
     }
 
     pub async fn run(&self) -> Result<()> {

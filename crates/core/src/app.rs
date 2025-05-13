@@ -13,7 +13,7 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new(config: &Config, event_tx: mpsc::Sender<Event>) -> Self {
+    pub fn new(_config: &Config, _event_tx: mpsc::Sender<Event>) -> Self {
         // This is a placeholder implementation
         Self {}
     }
@@ -25,12 +25,12 @@ impl Terminal {
 
 // Placeholder for renderer
 pub struct Renderer {
-    config: Config,
+    _config: Config,
 }
 
 impl Renderer {
     pub fn new(config: &Config) -> Self {
-        Self { config: config.clone() }
+        Self { _config: config.clone() }
     }
 
     pub async fn initialize(&self) -> Result<()> {
@@ -40,21 +40,21 @@ impl Renderer {
 
 // Placeholder for block manager
 pub struct BlockManager {
-    state: Arc<Mutex<AppState>>,
+    _state: Arc<Mutex<AppState>>,
 }
 
 impl BlockManager {
     pub fn new(state: Arc<Mutex<AppState>>) -> Self {
-        Self { state }
+        Self { _state: state }
     }
 }
 
 pub struct VoidCLI {
-    config: Config,
-    state: Arc<Mutex<AppState>>,
+    _config: Config,
+    _state: Arc<Mutex<AppState>>,
     terminal: Terminal,
     renderer: Renderer,
-    block_manager: BlockManager,
+    _block_manager: BlockManager,
     event_loop: EventLoop,
 }
 
@@ -68,11 +68,11 @@ impl VoidCLI {
         let event_loop = EventLoop::new(state.clone(), event_rx);
 
         Self {
-            config,
-            state,
+            _config: config,
+            _state: state,
             terminal,
             renderer,
-            block_manager,
+            _block_manager: block_manager,
             event_loop,
         }
     }
